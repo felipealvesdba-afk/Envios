@@ -34,8 +34,15 @@ The original `/app` workspace contained only the boilerplate React/FastAPI scaff
 - ✅ Cálculo server-side de `is_late` / `days_late` / `status_bucket`.
 - ✅ Relatório CSV com BOM (Excel pt-BR friendly).
 - ✅ Tipografia Chivo + IBM Plex Sans, paleta high-contrast Swiss style.
-- ✅ Test suite backend: 25/25 verdes (iteration_1).
+- ✅ Test suite backend: 25/25 verdes (iteration_1 + iteration_2).
 - ✅ Validado com a planilha real do usuário (1.731 linhas, 57 atrasos, 3.3% taxa).
+
+## Refactor pass (2026-04-26)
+- ✅ Backend: `import_csv()` quebrado em helpers (`_validate_upload`, `_read_csv_smart`, `_row_get`, `_build_order_doc`, `_summarize_buckets`) — complexidade ciclomática 23 → ~6.
+- ✅ Frontend: `useCallback` em todos os loaders (Dashboard, LateDeliveries, Tickets); Recharts config movido para constantes do módulo; sub-componentes extraídos (`ChartSection`, `HighlightsSection`, `FiltersBar`, `LateTable`, `TicketCard`, etc.); ternários aninhados eliminados; constantes nomeadas (`BYTES_PER_KB`, `SEARCH_DEBOUNCE_MS`).
+- ✅ Logging em `catch` blocks (sem mais `swallow silente`).
+- ✅ Lint: ruff + eslint 100% verdes.
+- ✅ Regressão: 25/25 testes ainda passam.
 
 ## P1 / Backlog
 - [ ] Tornar o import atômico (insert-then-delete vs delete-then-insert).
