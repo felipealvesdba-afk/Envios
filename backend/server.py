@@ -182,17 +182,13 @@ async def root():
     return {"message": "Delivery Tracker API"}
 
 
-@api_router.post("/import/csv", response_model=ImportSummary)
-async def import_csv(file: UploadFile = File(...)):
+def _validate_upload(file: UploadFile) -> None:
     if not file.filename or not file.filename.lower().endswith((".csv", ".txt")):
         raise HTTPException(status_code=400, detail="Envie um arquivo .csv")
 
-    content = await file.read()
-    if not content:
-        raise HTTPException(status_code=400, detail="Arquivo vazio.")
 
-    # Try common encodings
-    df = None
+def _read_csv_smart(content: bytes) -> pd.DataFrame:
+    """Sniff encoding/delimiter and return a DataFrame. Raises HTTPException on failure."""
     last_error: Optional[str] = None
     for enc in ("utf-8-sig", "utf-8", "latin-1", "cp1252"):
         for sep in (";", ","):
@@ -206,98 +202,89 @@ async def import_csv(file: UploadFile = File(...)):
                     engine="python",
                     on_bad_lines="skip",
                 )
-                # Heuristic: must have more than 5 columns (real data)
-                if df.shape[1] >= 5:
-                    raise StopIteration
-            except StopIteration:
-                break
             except Exception as e:  # pragma: no cover
                 last_error = f"{enc}/{sep}: {e}"
-                df = None
                 continue
-        if df is not None and df.shape[1] >= 5:
-            break
+            if df.shape[1] >= 5 and not df.empty:
+                df.columns = [_normalize_header(c) for c in df.columns]
+                return df
+    raise HTTPException(status_code=400, detail=f"Não foi possível ler o CSV. {last_error or ''}")
 
-    if df is None or df.empty:
-        raise HTTPException(status_code=400, detail=f"Não foi possível ler o CSV. {last_error or ''}")
 
-    # Normalize headers
-    df.columns = [_normalize_header(c) for c in df.columns]
+def _row_get(row, key: str) -> str:
+    v = row.get(key, "")
+    if v is None:
+        return ""
+    s = str(v).strip()
+    return "" if s.lower() in {"nan", "nat", "none"} else s
+
+
+def _build_order_doc(row, import_id: str, today: date) -> Dict[str, Any]:
+    """Convert a CSV row into an order document with computed delay fields."""
+    situacao = _row_get(row, "situacao")
+    prev_d = _parse_date(row.get("previsao_entrega"))
+    entrega_d = _parse_date(row.get("data_entrega"))
+    is_late, days_late, bucket = _compute_late(situacao, prev_d, entrega_d, today)
+
+    return {
+        "id": str(uuid.uuid4()),
+        "import_id": import_id,
+        "sla_conta": _row_get(row, "sla_conta"),
+        "loja": _row_get(row, "loja"),
+        "numero_os": _row_get(row, "numero_os"),
+        "codigo_rastreamento": _row_get(row, "codigo_rastreamento"),
+        "situacao": situacao,
+        "forma_envio": _row_get(row, "forma_envio") or "Não informado",
+        "valor_frete": _row_get(row, "valor_frete"),
+        "dias_para_entrega": _row_get(row, "dias_para_entrega"),
+        "data_envio": _to_iso(_parse_date(row.get("data_envio"))),
+        "previsao_entrega": _to_iso(prev_d),
+        "primeira_tentativa": _to_iso(_parse_date(row.get("primeira_tentativa"))),
+        "data_entrega": _to_iso(entrega_d),
+        "destinatario": _row_get(row, "destinatario"),
+        "cpf_cnpj": _row_get(row, "cpf_cnpj"),
+        "email": _row_get(row, "email"),
+        "endereco": _row_get(row, "endereco"),
+        "numero": _row_get(row, "numero"),
+        "complemento": _row_get(row, "complemento"),
+        "bairro": _row_get(row, "bairro"),
+        "cep": _row_get(row, "cep"),
+        "cidade": _row_get(row, "cidade"),
+        "uf": _row_get(row, "uf"),
+        "etiqueta": _row_get(row, "etiqueta"),
+        "peso": _row_get(row, "peso"),
+        "valor_declarado": _row_get(row, "valor_declarado"),
+        "referencia": _row_get(row, "referencia"),
+        "data_coleta": _to_iso(_parse_date(row.get("data_coleta"))),
+        "data_ultimo_rastreio": _to_iso(_parse_date(row.get("data_ultimo_rastreio"))),
+        "descricao_ultimo_rastreio": _row_get(row, "descricao_ultimo_rastreio"),
+        "tentativas_entrega": _row_get(row, "tentativas_entrega"),
+        "is_late": is_late,
+        "days_late": days_late,
+        "status_bucket": bucket,
+        "imported_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _summarize_buckets(docs: List[Dict[str, Any]]) -> Dict[str, int]:
+    counts = {"late": 0, "on_time": 0, "pending": 0, "excluded": 0}
+    for d in docs:
+        counts[d["status_bucket"]] = counts.get(d["status_bucket"], 0) + 1
+    return counts
+
+
+@api_router.post("/import/csv", response_model=ImportSummary)
+async def import_csv(file: UploadFile = File(...)):
+    _validate_upload(file)
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Arquivo vazio.")
+
+    df = _read_csv_smart(content)
 
     import_id = str(uuid.uuid4())
     today = datetime.now(timezone.utc).date()
-
-    docs: List[Dict[str, Any]] = []
-    late_count = on_time_count = pending_count = excluded_count = 0
-
-    def _get(row, k):
-        v = row.get(k, "")
-        if v is None:
-            return ""
-        s = str(v).strip()
-        return "" if s.lower() in {"nan", "nat", "none"} else s
-
-    for _, row in df.iterrows():
-        def get(k, _r=row):
-            return _get(_r, k)
-        situacao = get("situacao")
-        prev_d = _parse_date(row.get("previsao_entrega"))
-        entrega_d = _parse_date(row.get("data_entrega"))
-        envio_d = _parse_date(row.get("data_envio"))
-        coleta_d = _parse_date(row.get("data_coleta"))
-        ultimo_d = _parse_date(row.get("data_ultimo_rastreio"))
-        primeira_d = _parse_date(row.get("primeira_tentativa"))
-
-        is_late, days_late, bucket = _compute_late(situacao, prev_d, entrega_d, today)
-
-        if bucket == "late":
-            late_count += 1
-        elif bucket == "on_time":
-            on_time_count += 1
-        elif bucket == "pending":
-            pending_count += 1
-        else:
-            excluded_count += 1
-
-        doc = {
-            "id": str(uuid.uuid4()),
-            "import_id": import_id,
-            "sla_conta": get("sla_conta"),
-            "loja": get("loja"),
-            "numero_os": get("numero_os"),
-            "codigo_rastreamento": get("codigo_rastreamento"),
-            "situacao": situacao,
-            "forma_envio": get("forma_envio") or "Não informado",
-            "valor_frete": get("valor_frete"),
-            "dias_para_entrega": get("dias_para_entrega"),
-            "data_envio": _to_iso(envio_d),
-            "previsao_entrega": _to_iso(prev_d),
-            "primeira_tentativa": _to_iso(primeira_d),
-            "data_entrega": _to_iso(entrega_d),
-            "destinatario": get("destinatario"),
-            "cpf_cnpj": get("cpf_cnpj"),
-            "email": get("email"),
-            "endereco": get("endereco"),
-            "numero": get("numero"),
-            "complemento": get("complemento"),
-            "bairro": get("bairro"),
-            "cep": get("cep"),
-            "cidade": get("cidade"),
-            "uf": get("uf"),
-            "etiqueta": get("etiqueta"),
-            "peso": get("peso"),
-            "valor_declarado": get("valor_declarado"),
-            "referencia": get("referencia"),
-            "data_coleta": _to_iso(coleta_d),
-            "data_ultimo_rastreio": _to_iso(ultimo_d),
-            "descricao_ultimo_rastreio": get("descricao_ultimo_rastreio"),
-            "tentativas_entrega": get("tentativas_entrega"),
-            "is_late": is_late,
-            "days_late": days_late,
-            "status_bucket": bucket,
-            "imported_at": datetime.now(timezone.utc).isoformat(),
-        }
-        docs.append(doc)
+    docs = [_build_order_doc(row, import_id, today) for _, row in df.iterrows()]
 
     if not docs:
         raise HTTPException(status_code=400, detail="Nenhuma linha válida encontrada.")
@@ -306,14 +293,15 @@ async def import_csv(file: UploadFile = File(...)):
     await db.orders.delete_many({})
     await db.orders.insert_many(docs)
 
+    counts = _summarize_buckets(docs)
     return ImportSummary(
         import_id=import_id,
         total_rows=len(docs),
         inserted=len(docs),
-        late_count=late_count,
-        on_time_count=on_time_count,
-        pending_count=pending_count,
-        excluded_count=excluded_count,
+        late_count=counts["late"],
+        on_time_count=counts["on_time"],
+        pending_count=counts["pending"],
+        excluded_count=counts["excluded"],
     )
 
 

@@ -2,6 +2,9 @@ import React, { useRef, useState } from "react";
 import { UploadCloud, FileText, CheckCircle2, AlertCircle, Loader2, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 
+const BYTES_PER_KB = 1024;
+const ACCEPTED_EXTENSION = /\.(csv|txt)$/i;
+
 export default function ImportCSV({ onImported }) {
   const inputRef = useRef(null);
   const [dragOver, setDragOver] = useState(false);
@@ -17,7 +20,7 @@ export default function ImportCSV({ onImported }) {
     setResult(null);
     const f = files?.[0];
     if (!f) return;
-    if (!/\.(csv|txt)$/i.test(f.name)) {
+    if (!ACCEPTED_EXTENSION.test(f.name)) {
       setError("Selecione um arquivo .csv válido.");
       return;
     }
@@ -108,7 +111,7 @@ export default function ImportCSV({ onImported }) {
             </div>
             <div>
               <div className="font-medium text-sm">{file.name}</div>
-              <div className="text-xs text-zinc-500">{(file.size / 1024).toFixed(1)} KB</div>
+              <div className="text-xs text-zinc-500">{(file.size / BYTES_PER_KB).toFixed(1)} KB</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
