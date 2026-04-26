@@ -1,0 +1,93 @@
+{
+  "project_name": "Delivery Tracker",
+  "theme": "Light",
+  "archetype": "4 (Swiss & High-Contrast)",
+  "domain": "Logistics, Dashboard, B2B SaaS",
+  "language": "pt-BR",
+  "typography": {
+    "headings": "Chivo",
+    "body": "IBM Plex Sans",
+    "rules": {
+      "h1": "text-3xl sm:text-4xl tracking-tight font-black",
+      "h2": "text-2xl sm:text-3xl tracking-tight font-bold",
+      "h3": "text-xl sm:text-2xl tracking-tight font-semibold",
+      "h4": "text-lg font-semibold",
+      "body": "text-sm sm:text-base leading-relaxed",
+      "labels": "text-xs uppercase tracking-[0.2em] font-semibold text-zinc-500"
+    }
+  },
+  "color_palette": {
+    "background": "#FFFFFF",
+    "surface": "#F4F4F5",
+    "border": "#E4E4E7",
+    "text_primary": "#09090B",
+    "text_secondary": "#52525B",
+    "brand_primary": "#09090B",
+    "status": {
+      "delayed": { "text": "#9F1239", "bg": "#FFE4E6", "border": "#FECDD3", "row_bg": "#FEF2F2" },
+      "on_time": { "text": "#166534", "bg": "#DCFCE7", "border": "#BBF7D0", "row_bg": "#FFFFFF" },
+      "pending": { "text": "#854D0E", "bg": "#FEF08A", "border": "#FDE047", "row_bg": "#FFFFFF" }
+    }
+  },
+  "layout_spacing": {
+    "philosophy": "Control Room Grid - Density, Data Correlation, Scanability. Optimized for desktop.",
+    "container": "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",
+    "grid": "grid-cols-1 md:grid-cols-4 gap-4 sm:gap-6",
+    "cards": "border border-zinc-200 bg-white rounded-none sm:rounded-sm p-4 shadow-sm",
+    "tables": "w-full text-sm text-left border-collapse",
+    "navigation": "Top navbar or left sidebar with distinct active states."
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-zinc-900 text-white hover:bg-zinc-800 rounded-sm px-4 py-2 font-medium transition-colors focus:ring-2 focus:ring-zinc-950 focus:ring-offset-2",
+      "destructive": "bg-rose-600 text-white hover:bg-rose-700 rounded-sm px-4 py-2 font-medium transition-colors focus:ring-2 focus:ring-rose-600 focus:ring-offset-2",
+      "outline": "border border-zinc-200 bg-white hover:bg-zinc-100 text-zinc-900 rounded-sm px-4 py-2 font-medium transition-colors"
+    },
+    "badges": "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border",
+    "inputs": "flex h-9 w-full rounded-sm border border-zinc-300 bg-white px-3 py-1 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 transition-colors",
+    "tabs": "flex space-x-1 border-b border-zinc-200 mb-6"
+  },
+  "pages_and_features": [
+    {
+      "name": "Dashboard",
+      "description": "Visão geral com 4 KPIs e gráficos de atrasos.",
+      "kpis": ["Total de Pedidos", "Em Atraso (Red Alert)", "Chamados Abertos", "Taxa de Atraso"],
+      "charts": "Gráfico de barras 'Atrasos por Forma de Envio' usando Recharts.",
+      "highlights_table": "Tabela 'Entregas atrasadas em destaque'. Linhas com bg vermelho suave. Botão 'Abrir Chamado'."
+    },
+    {
+      "name": "Entregas Atrasadas",
+      "description": "Tabela completa com busca (Nome) e filtros (Status, Transportadora).",
+      "actions": "Botão de 'Exportar Relatório' (Download CSV)."
+    },
+    {
+      "name": "Chamados",
+      "description": "Lista de chamados com status: Aberto, Em andamento, Resolvido."
+    },
+    {
+      "name": "Importar",
+      "description": "Upload drag-and-drop de arquivo CSV. Suporte: delimitador ';', UTF-8, datas DD/MM/YY."
+    }
+  ],
+  "accessibility_and_interactions": {
+    "hover_states": "Explicitly set text color and background on hover.",
+    "focus_states": "High contrast ring focus for all interactive elements.",
+    "data_testids": "All buttons, inputs, tabs, and table rows MUST include descriptive data-testid attributes (e.g., data-testid='upload-csv-input').",
+    "transitions": "transition-all duration-200 ease-in-out"
+  },
+  "media": {
+    "image_urls": [],
+    "icons_library": "lucide-react",
+    "icons_used": ["LayoutDashboard", "AlertTriangle", "Ticket", "UploadCloud", "Download", "Search", "Filter", "Package", "Truck", "AlertCircle"]
+  },
+  "instructions_to_main_agent": [
+    "Strictly follow the 'Swiss & High-Contrast' archetype for a data-dense logistics dashboard.",
+    "Use Chivo for headings and IBM Plex Sans for body text. Install these via Google Fonts if necessary.",
+    "The UI should feel like an operational control room: avoid excessive white space where data density is needed. Use strict borders and subtle shading.",
+    "Implement the chart using 'recharts'.",
+    "Ensure the highlighted delayed deliveries table visually stands out (using the specified delayed row_bg color) and has an immediate action ('Abrir Chamado').",
+    "Include 'lucide-react' icons where appropriate to enhance quick scanability.",
+    "Implement the CSV import feature taking note of the Portuguese standard formatting (';' delimited, DD/MM/YY date formats).",
+    "Ensure all key elements have 'data-testid' attributes for robust testing."
+  ]
+}
