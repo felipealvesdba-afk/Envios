@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React from "react";
 import { Package, AlertTriangle, Ticket, TrendingDown, Truck, Loader2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import { api, fmtNumber, fmtDate, cn } from "@/lib/api";
+import { fmtNumber, fmtDate, cn } from "@/lib/api";
 import { SituacaoBadge } from "@/components/StatusBadge";
+import { useDashboardData } from "@/hooks/useDashboardData";
 
 // --- Static recharts config (kept outside component to avoid re-renders) ---
 const CHART_MARGIN = { top: 8, right: 16, left: 0, bottom: 24 };
@@ -188,31 +189,7 @@ function HighlightsSection({ loading, rows, empty, onOpenTicket }) {
 }
 
 export default function Dashboard({ onOpenTicket, onGoToImport, refreshKey }) {
-  const [stats, setStats] = useState(null);
-  const [byCarrier, setByCarrier] = useState([]);
-  const [highlights, setHighlights] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [s, c, h] = await Promise.all([
-        api.get("/dashboard/stats"),
-        api.get("/dashboard/by-carrier"),
-        api.get("/orders/late/highlights", { params: { limit: 8 } }),
-      ]);
-      setStats(s.data);
-      setByCarrier(c.data || []);
-      setHighlights(h.data || []);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load, refreshKey]);
-
+  const { stats, byCarrier, highlights, loading } = useDashboardData(refreshKey);
   const empty = stats && stats.total_orders === 0;
 
   return (
